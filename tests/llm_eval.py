@@ -2,6 +2,7 @@
 
     python tests/llm_eval.py --provider anthropic --model claude-opus-5
     python tests/llm_eval.py --provider openai --model gpt-4o-mini
+    python tests/llm_eval.py --provider openrouter --model qwen/qwen3-32b
     python tests/llm_eval.py --provider openai --model llama3.1:8b --base-url http://localhost:11434/v1
     python tests/llm_eval.py --provider scripted            # harness self-check, no API key
 
@@ -118,11 +119,13 @@ class AnthropicAdapter:
 
 
 class OpenAIAdapter:
-    """Any OpenAI-compatible chat endpoint (OpenAI, Ollama, vLLM, LM Studio, OpenRouter…)."""
+    """Any OpenAI-compatible chat endpoint (OpenAI, Ollama, vLLM, LM Studio…)."""
 
-    def __init__(self, model: str, base_url: str | None):
+    def __init__(self, model: str, base_url: str | None, *, api_key: str | None = None,
+                 default_headers: dict[str, str] | None = None):
         from openai import OpenAI
-        self.client = OpenAI(base_url=base_url, api_key=os.environ.get("OPENAI_API_KEY", "none"))
+        self.client = OpenAI(base_url=base_url, api_key=api_key or os.environ.get("OPENAI_API_KEY", "none"),
+                             default_headers=default_headers)
         self.model = model
         self.messages: list[dict] = []
 
@@ -149,6 +152,24 @@ class OpenAIAdapter:
                 args = {"line": tc.function.arguments}
             calls.append(ToolCall(tc.id, args if isinstance(args, dict) else {"line": str(args)}))
         return Step(msg.content or None, calls)
+
+
+class OpenRouterAdapter(OpenAIAdapter):
+    """OpenRouter via its OpenAI-compatible chat-completions endpoint."""
+
+    def __init__(self, model: str):
+        api_key = os.environ.get("OPENROUTER_API_KEY")
+        if not api_key:
+            raise RuntimeError("OPENROUTER_API_KEY is required for --provider openrouter")
+        super().__init__(
+            model,
+            "https://openrouter.ai/api/v1",
+            api_key=api_key,
+            default_headers={
+                "HTTP-Referer": "https://github.com/herclogon/aci",
+                "X-OpenRouter-Title": "ACI evaluation harness",
+            },
+        )
 
 
 class ScriptedAdapter:
@@ -305,6 +326,10 @@ def make_adapter(args: argparse.Namespace, case: dict) -> Adapter:
         if not args.model:
             sys.exit("--model is required for --provider openai")
         return OpenAIAdapter(args.model, args.base_url)
+    if args.provider == "openrouter":
+        if not args.model:
+            sys.exit("--model is required for --provider openrouter")
+        return OpenRouterAdapter(args.model)
     if args.provider == "scripted":
         from scripted_agents import SCRIPTS
         return ScriptedAdapter(SCRIPTS[case["name"]])
@@ -313,7 +338,7 @@ def make_adapter(args: argparse.Namespace, case: dict) -> Adapter:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--provider", choices=["anthropic", "openai", "scripted"], required=True)
+    ap.add_argument("--provider", choices=["anthropic", "openai", "openrouter", "scripted"], required=True)
     ap.add_argument("--model")
     ap.add_argument("--base-url", help="OpenAI-compatible endpoint (Ollama: http://localhost:11434/v1)")
     ap.add_argument("--format", choices=["text", "json"], default="text", help="How results are shown to the model")
@@ -321,6 +346,9 @@ def main() -> int:
     ap.add_argument("--repeat", type=int, default=1, help="Runs per case (models are stochastic)")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
+
+    if args.provider == "openrouter" and not os.environ.get("OPENROUTER_API_KEY"):
+        ap.error("OPENROUTER_API_KEY is required for --provider openrouter")
 
     cases = json.loads((Path(__file__).parent / "cases.json").read_text())["cases"]
     if args.case:

@@ -12,7 +12,8 @@ text from §6, and the system prompt in `../AGENT_PROMPT.md`.
 | `aci_mock.py` | In-process ACI server over the fixture — lexing, flag rules, `@input`, coercion, help, search, tasks, `--dry-run`/`--yes`, error catalogue. `render_text()` is the host-side text rendering. |
 | `cases.json` | Eval cases: user turns, pass checks, call budget. |
 | `scripted_agents.py` | Golden script per case (proves each case is solvable). |
-| `llm_eval.py` | Runner + provider adapters (`anthropic`, `openai`-compatible, `scripted`). |
+| `llm_eval.py` | Runner + provider adapters (`anthropic`, `openai`-compatible, `openrouter`, `scripted`). |
+| `qwen_openrouter.py` | Catalog-validated OpenRouter sweep across descending Qwen model sizes. |
 | `test_harness.py` | Unit tests for the mock's spec behaviour and the harness scoring. |
 | `results/` | JSON reports, one per run. |
 
@@ -31,7 +32,17 @@ pip install openai
 python tests/llm_eval.py --provider openai --model gpt-4o-mini            # OPENAI_API_KEY
 python tests/llm_eval.py --provider openai --model llama3.1:8b --base-url http://localhost:11434/v1   # Ollama
 python tests/llm_eval.py --provider openai --model qwen2.5:7b --base-url http://localhost:11434/v1 --format json
+
+export OPENROUTER_API_KEY=...
+python tests/llm_eval.py --provider openrouter --model qwen/qwen3-32b
+python tests/qwen_openrouter.py
 ```
+
+The default Qwen sweep requests 32B, 27B, 14B, 9B, 8B, 7B, and 4B model
+slugs. It reads OpenRouter's live catalog first and skips discontinued or
+temporarily unavailable entries. Use repeated `--model` flags to choose a
+different set, and the regular `--case`, `--repeat`, `--format`, and `-v`
+options to control the evaluation.
 
 `--format text` (default) shows the model the host-rendered text of each
 result; `--format json` shows the raw envelope. Comparing the two for the
