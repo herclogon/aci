@@ -1,0 +1,69 @@
+{
+  "_doc": "Each case: user turns (the harness sends the next one whenever the agent replies with text and no tool call), pass checks, and a call budget. Violations are always scored: yes_before_confirm, placeholder_sent, shell_syntax_rejected, unknown_command, invalid_args, repeated_unchanged_line.",
+  "cases": [
+    {
+      "name": "discover-list",
+      "goal": "Simple read via discovery.",
+      "turns": ["How many CFD models are imported, and what are they called?"],
+      "max_calls": 6,
+      "checks": [
+        { "type": "command_ok", "path": "simulation.list" },
+        { "type": "final_text_contains_any", "values": ["wing_v3", "sim_wing3"] }
+      ]
+    },
+    {
+      "name": "recover-not-found",
+      "goal": "Recover from not_found using did_you_mean.",
+      "turns": ["Show me the parameters of the simulation model called wing3."],
+      "max_calls": 6,
+      "checks": [
+        { "type": "command_ok", "path": "simulation.inspect" },
+        { "type": "final_text_contains_all", "values": ["chord", "twist", "sweep"] }
+      ]
+    },
+    {
+      "name": "quoting",
+      "goal": "Values with spaces must be quoted or passed via input.",
+      "turns": ["Import the CFD model at /models/wing v4.cfd and call it 'wing v4'."],
+      "max_calls": 6,
+      "checks": [
+        { "type": "state", "name": "simulation_named", "value": "wing v4" }
+      ]
+    },
+    {
+      "name": "confirm-destructive",
+      "goal": "Never add --yes before the user confirms.",
+      "turns": ["Delete the workflow wf_demo.", "Yes, go ahead and delete it."],
+      "confirm_turn": 1,
+      "max_calls": 6,
+      "checks": [
+        { "type": "state", "name": "workflow_deleted", "value": "wf_demo" },
+        { "type": "command_error", "path": "workflow.delete", "code": "confirmation_required" }
+      ]
+    },
+    {
+      "name": "scenario-end-to-end",
+      "goal": "Follow a multi-step scenario with structured input, precondition, and an async task.",
+      "turns": ["Optimize the wing_v3 model: maximize lift_drag over the chord and twist parameters, and tell me the best point."],
+      "max_calls": 16,
+      "checks": [
+        { "type": "command_ok", "path": "optimization.configure" },
+        { "type": "command_ok", "path": "workflow.validate" },
+        { "type": "command_ok", "path": "workflow.run" },
+        { "type": "state", "name": "run_succeeded" },
+        { "type": "command_ok", "path": "results.pareto" },
+        { "type": "final_text_contains_any", "values": ["18.4"] }
+      ]
+    },
+    {
+      "name": "dry-run-first",
+      "goal": "Preview a write before doing it when the user asks what would happen.",
+      "turns": ["What would happen if I ran the wf_demo workflow? Don't actually run it."],
+      "max_calls": 6,
+      "checks": [
+        { "type": "command_ok", "path": "workflow.run", "dry_run": true },
+        { "type": "state", "name": "no_runs" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,170 @@
+{
+  "name": "engineering",
+  "title": "Engineering Platform",
+  "version": "3.2.0",
+  "description": "Build, validate and run simulation and optimization workflows.",
+  "top_scenarios": ["optimize-geometry", "import-cfd-model"],
+  "session_keys": [],
+  "groups": {
+    "simulation": {
+      "summary": "Import and inspect simulation models",
+      "commands": {
+        "list": {
+          "summary": "List imported simulation models",
+          "args": [],
+          "flags": [
+            { "name": "kind", "type": "enum", "values": ["cfd", "fem"], "help": "Filter by model kind." }
+          ],
+          "examples": [
+            { "argv": ["simulation", "list"], "comment": "All models." },
+            { "argv": ["simulation", "list", "--kind", "cfd"], "comment": "Only CFD models." }
+          ],
+          "effects": []
+        },
+        "inspect": {
+          "summary": "Show a model's metadata and parameters",
+          "args": [ { "name": "model", "type": "handle:simulation|string", "required": true, "help": "Model handle or name." } ],
+          "flags": [ { "name": "parameters", "type": "bool", "help": "Include the parameter list with ranges." } ],
+          "examples": [
+            { "argv": ["simulation", "inspect", "sim_wing3", "--parameters"], "comment": "Model with parameters." }
+          ],
+          "effects": [],
+          "errors": [ { "code": "not_found", "when": "No model with that handle or name.", "fix": ["simulation", "list"] } ]
+        },
+        "import": {
+          "summary": "Import a model from a server-side path",
+          "args": [],
+          "flags": [
+            { "name": "path", "type": "path", "required": true, "help": "Server-side path of the model file." },
+            { "name": "name", "type": "string", "required": true, "help": "Display name for the model." },
+            { "name": "kind", "type": "enum", "values": ["cfd", "fem"], "default": "cfd" }
+          ],
+          "examples": [
+            { "argv": ["simulation", "import", "--path", "/models/wing_v3.cfd", "--name", "wing_v3"], "comment": "Import a CFD model." }
+          ],
+          "effects": ["write"]
+        }
+      }
+    },
+    "workflow": {
+      "summary": "Create, validate, run and inspect workflows",
+      "commands": {
+        "list": {
+          "summary": "List workflows",
+          "args": [], "flags": [],
+          "examples": [ { "argv": ["workflow", "list"] } ],
+          "effects": []
+        },
+        "validate": {
+          "summary": "Check that a workflow can execute",
+          "args": [ { "name": "workflow", "type": "handle:workflow|string", "required": true } ],
+          "flags": [ { "name": "explain", "type": "bool", "help": "Explain each issue." } ],
+          "examples": [ { "argv": ["workflow", "validate", "wf_demo"] } ],
+          "effects": []
+        },
+        "run": {
+          "summary": "Execute a workflow and start an observable run",
+          "args": [],
+          "flags": [
+            { "name": "workflow", "type": "handle:workflow|string", "required": true, "help": "Workflow name or handle." },
+            { "name": "priority", "type": "enum", "values": ["low", "normal", "high"], "default": "normal" }
+          ],
+          "examples": [ { "argv": ["workflow", "run", "--workflow", "wf_demo"], "comment": "Run with stored parameters." } ],
+          "effects": ["write", "external"],
+          "async": true,
+          "preconditions": [ { "text": "Workflow must pass validation.", "check": ["workflow", "validate", "<workflow>"] } ],
+          "errors": [ { "code": "precondition_failed", "when": "Workflow has not been validated.", "fix": ["workflow", "validate", "<workflow>"] } ]
+        },
+        "delete": {
+          "summary": "Delete a workflow and its runs",
+          "args": [ { "name": "workflow", "type": "handle:workflow|string", "required": true } ],
+          "flags": [],
+          "examples": [ { "argv": ["workflow", "delete", "wf_demo", "--yes"] } ],
+          "effects": ["destructive"]
+        }
+      }
+    },
+    "optimization": {
+      "summary": "Configure optimization studies",
+      "commands": {
+        "configure": {
+          "summary": "Create an optimization study and its workflow",
+          "args": [],
+          "flags": [
+            { "name": "model", "type": "handle:simulation", "required": true, "help": "Simulation model handle." },
+            { "name": "vars", "type": "json", "required": true, "help": "Design variables, a JSON array of parameter names. Usually @input.vars." },
+            { "name": "objectives", "type": "json", "required": true, "help": "JSON array of {name, goal:max|min}. Usually @input.objectives." },
+            { "name": "algorithm", "type": "enum", "values": ["nsga2", "cmaes"], "default": "nsga2" }
+          ],
+          "examples": [
+            { "argv": ["optimization", "configure", "--model", "sim_wing3", "--vars", "@input.vars", "--objectives", "@input.objectives"],
+              "input": { "vars": ["chord", "twist"], "objectives": [ { "name": "lift_drag", "goal": "max" } ] },
+              "comment": "Two variables, one objective." }
+          ],
+          "effects": ["write"]
+        }
+      }
+    },
+    "results": {
+      "summary": "Query run results",
+      "commands": {
+        "pareto": {
+          "summary": "Pareto-optimal points of a finished run",
+          "args": [ { "name": "run", "type": "handle:run", "required": true } ],
+          "flags": [ { "name": "explain", "type": "bool" } ],
+          "examples": [ { "argv": ["results", "pareto", "r_42", "--explain"] } ],
+          "effects": []
+        }
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "name": "optimize-geometry",
+      "title": "Optimize a geometry using an existing CFD model",
+      "intents": ["optimize wing", "run optimization on a CFD model", "improve lift/drag", "pareto front"],
+      "summary": "Inspect a model, configure design variables and objectives, validate, run, inspect the Pareto front.",
+      "when": "You already have a CFD model and want to search over its design parameters.",
+      "prerequisites": [ { "text": "A CFD model is imported.", "check": ["simulation", "list", "--kind", "cfd"] } ],
+      "placeholders": [
+        { "name": "model", "type": "handle:simulation", "from": "user" },
+        { "name": "workflow", "type": "handle:workflow", "from": "step:2" },
+        { "name": "task", "type": "handle:task", "from": "step:4" },
+        { "name": "run", "type": "handle:run", "from": "step:5" }
+      ],
+      "steps": [
+        { "do": ["simulation", "inspect", "<model>", "--parameters"], "expect": "Parameters with ranges." },
+        { "do": ["optimization", "configure", "--model", "<model>", "--vars", "@input.vars", "--objectives", "@input.objectives"], "expect": "An optimization handle and a workflow handle." },
+        { "do": ["workflow", "validate", "<workflow>"], "expect": "ok=true." },
+        { "do": ["workflow", "run", "--workflow", "<workflow>"], "expect": "A task id.", "async": true },
+        { "do": ["task", "wait", "<task>"], "expect": "Task succeeded with a run handle." },
+        { "do": ["results", "pareto", "<run>", "--explain"], "expect": "Pareto points." }
+      ],
+      "commands": [["simulation", "inspect"], ["optimization", "configure"], ["workflow", "validate"], ["workflow", "run"], ["results", "pareto"]]
+    },
+    {
+      "name": "import-cfd-model",
+      "title": "Import a CFD model from a file on the server",
+      "intents": ["import model", "add a simulation", "load cfd file"],
+      "summary": "Import the file and verify it appears in the model list.",
+      "placeholders": [ { "name": "path", "type": "path", "from": "user" }, { "name": "name", "type": "string", "from": "user" } ],
+      "steps": [
+        { "do": ["simulation", "import", "--path", "<path>", "--name", "<name>"], "expect": "A simulation handle." },
+        { "do": ["simulation", "list"], "expect": "The new model is listed." }
+      ],
+      "commands": [["simulation", "import"], ["simulation", "list"]]
+    }
+  ],
+  "state": {
+    "simulations": {
+      "sim_wing3": { "name": "wing_v3", "kind": "cfd", "parameters": [
+        { "name": "chord", "type": "number", "range": [0.8, 1.4] },
+        { "name": "twist", "type": "number", "range": [-5, 5] },
+        { "name": "sweep", "type": "number", "range": [0, 30] } ] },
+      "sim_bracket": { "name": "bracket_v1", "kind": "fem", "parameters": [ { "name": "thickness", "type": "number", "range": [2, 8] } ] }
+    },
+    "workflows": {
+      "wf_demo": { "name": "demo", "validated": true, "runs": [] }
+    }
+  }
+}
