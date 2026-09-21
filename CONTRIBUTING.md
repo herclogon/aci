@@ -1,6 +1,6 @@
-# Contributing to ACI
+# Contributing to AAI
 
-ACI is a draft protocol. Contributions that make the specification clearer,
+AAI is a draft protocol. Contributions that make the specification clearer,
 more interoperable, or easier for agents to use are welcome.
 
 ## Before proposing a change

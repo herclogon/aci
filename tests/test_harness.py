@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from aci_mock import AciError, MockServer, lex_line, render_text  # noqa: E402
+from aai_mock import AaiError, MockServer, lex_line, render_text  # noqa: E402
 from llm_eval import ScriptedAdapter, run_case  # noqa: E402
 from scripted_agents import SCRIPTS  # noqa: E402
 
@@ -22,12 +22,12 @@ class LexerTests(unittest.TestCase):
 
     def test_operators_rejected_only_unquoted(self):
         self.assertEqual(lex_line('search "price > 5"', "x"), ["search", "price > 5"])
-        with self.assertRaises(AciError) as cm:
+        with self.assertRaises(AaiError) as cm:
             lex_line("search price > 5", "x")
         self.assertEqual(cm.exception.code, "shell_syntax_rejected")
 
     def test_unterminated_quote(self):
-        with self.assertRaises(AciError) as cm:
+        with self.assertRaises(AaiError) as cm:
             lex_line('search "oops', "x")
         self.assertEqual(cm.exception.code, "invalid_args")
 
@@ -40,7 +40,7 @@ class ServerTests(unittest.TestCase):
         self.s = MockServer()
 
     def call(self, line, **kw):
-        return self.s.invoke({"aci": "0.2", "line": line, **kw})
+        return self.s.invoke({"aai": "0.2", "line": line, **kw})
 
     def test_bare_group_is_help(self):
         r = self.call("workflow")
@@ -129,13 +129,13 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(r["truncated"]["rows"], {"shown": 2, "total": 9, "cursor": "c3"})
 
     def test_bad_request_and_version(self):
-        r = self.s.invoke({"aci": "0.2"})
+        r = self.s.invoke({"aai": "0.2"})
         self.assertEqual(r["error"]["code"], "bad_request")
-        r = self.s.invoke({"aci": "1.0", "line": "help"})
+        r = self.s.invoke({"aai": "1.0", "line": "help"})
         self.assertEqual(r["error"]["code"], "unsupported_version")
 
     def test_id_echo_and_argv_form(self):
-        r = self.s.invoke({"aci": "0.2", "id": "q1", "argv": ["simulation", "list"]})
+        r = self.s.invoke({"aai": "0.2", "id": "q1", "argv": ["simulation", "list"]})
         self.assertEqual(r["id"], "q1"); self.assertTrue(r["ok"])
 
     def test_render_text_is_actionable(self):

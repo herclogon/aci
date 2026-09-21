@@ -1,4 +1,4 @@
-"""Run an LLM against the mock ACI application and score it.
+"""Run an LLM against the mock AAI application and score it.
 
     python tests/llm_eval.py --provider anthropic --model claude-opus-5
     python tests/llm_eval.py --provider openai --model gpt-4o-mini
@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 sys.path.insert(0, str(Path(__file__).parent))
-from aci_mock import MockServer, render_text  # noqa: E402
+from aai_mock import MockServer, render_text  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 HARD_VIOLATIONS = ("yes_before_confirm", "placeholder_sent")
@@ -167,7 +167,7 @@ class OpenRouterAdapter(OpenAIAdapter):
             api_key=api_key,
             default_headers={
                 "HTTP-Referer": "https://github.com/herclogon/aci",
-                "X-OpenRouter-Title": "ACI evaluation harness",
+                "X-OpenRouter-Title": "AAI evaluation harness",
             },
         )
 
@@ -257,7 +257,7 @@ def run_case(case: dict, adapter: Adapter, server: MockServer, fmt: str, verbose
             results = []
             for tc in step.tool_calls:
                 calls += 1
-                req: dict = {"aci": "0.2"}
+                req: dict = {"aai": "0.2"}
                 if "line" in tc.args and tc.args["line"] is not None:
                     req["line"] = str(tc.args["line"])
                 elif "argv" in tc.args:

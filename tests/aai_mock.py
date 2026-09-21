@@ -1,4 +1,4 @@
-"""In-process mock ACI server for LLM evaluation.
+"""In-process mock AAI server for LLM evaluation.
 
 Implements the parts of SPEC.md an agent actually touches: line lexing,
 path resolution, flag rules, @input, type coercion, help/--help, search,
@@ -15,14 +15,14 @@ import re
 from pathlib import Path
 from typing import Any
 
-ACI_VERSION = "0.2"
+AAI_VERSION = "0.2"
 GLOBAL_FLAGS = {"help", "format", "fields", "limit", "cursor", "dry-run", "yes", "async", "quiet"}
 BOOL_GLOBALS = {"help", "dry-run", "yes", "async", "quiet"}
 SHELL_CHARS = set("|&;<>()$`*?[~")
 DEFAULT_LIMIT = 20
 
 
-class AciError(Exception):
+class AaiError(Exception):
     def __init__(self, code: str, message: str, hint: str, **extra: Any):
         super().__init__(message)
         self.code, self.message, self.hint, self.extra = code, message, hint, extra
@@ -67,11 +67,11 @@ def lex_line(line: str, app_name: str) -> list[str]:
             cur.append(c); in_tok = True
         i += 1
     if quote:
-        raise AciError("invalid_args", "Unterminated quote in line.", "Close the quote, or pass the value via @input.")
+        raise AaiError("invalid_args", "Unterminated quote in line.", "Close the quote, or pass the value via @input.")
     if in_tok:
         tokens.append("".join(cur))
     if unquoted_ops:
-        raise AciError(
+        raise AaiError(
             "shell_syntax_rejected",
             f"Unquoted shell character {unquoted_ops[0]!r} is not allowed; this is not a shell.",
             "Quote the value (\"...\") or pass it via `input` and reference it as @input.<key>. "
@@ -118,7 +118,7 @@ class MockServer:
     def manifest(self) -> dict:
         a = self.app
         return {
-            "name": a["name"], "title": a["title"], "version": a["version"], "aci": ACI_VERSION,
+            "name": a["name"], "title": a["title"], "version": a["version"], "aai": AAI_VERSION,
             "levels": ["core", "search", "scenarios", "tasks"],
             "description": a["description"], "top_scenarios": a["top_scenarios"],
             "limits": {"max_help_depth": 2, "max_limit": 200, "default_limit": DEFAULT_LIMIT},
@@ -226,15 +226,15 @@ class MockServer:
         command = ""
         try:
             if not isinstance(request, dict) or ("argv" in request) == ("line" in request):
-                raise AciError("bad_request", "Exactly one of argv/line is required.", "Send {\"line\": \"help\"}.")
-            if request.get("aci", ACI_VERSION).split(".")[0] != ACI_VERSION.split(".")[0]:
-                raise AciError("unsupported_version", "Unsupported protocol version.", "Use aci 0.2.", details={"supported": [ACI_VERSION]})
+                raise AaiError("bad_request", "Exactly one of argv/line is required.", "Send {\"line\": \"help\"}.")
+            if request.get("aai", AAI_VERSION).split(".")[0] != AAI_VERSION.split(".")[0]:
+                raise AaiError("unsupported_version", "Unsupported protocol version.", "Use aai 0.2.", details={"supported": [AAI_VERSION]})
             if "line" in request:
                 argv = lex_line(str(request["line"]).strip(), self.app["name"])
             else:
                 argv = [str(t) for t in request["argv"]]
             if not argv:
-                raise AciError("bad_request", "Empty command.", "Send `help` to list commands.")
+                raise AaiError("bad_request", "Empty command.", "Send `help` to list commands.")
             options = dict(request.get("options") or {})
             path, kind, rest = self.resolve(argv)
             command = ".".join(path)
@@ -251,23 +251,23 @@ class MockServer:
             if parsed["globals"].get("help"):
                 return self._ok(command, **self._help_descriptor(desc, parsed["globals"]))
             return self._execute(desc, parsed, command)
-        except AciError as e:
+        except AaiError as e:
             return self._err(command, e)
 
     # ---- envelopes
     def _ok(self, command: str, summary: str, **fields: Any) -> dict:
-        r = {"aci": ACI_VERSION, "ok": True, "command": command, "summary": summary}
+        r = {"aai": AAI_VERSION, "ok": True, "command": command, "summary": summary}
         r.update({k: v for k, v in fields.items() if v is not None})
         return r
 
-    def _err(self, command: str, e: AciError) -> dict:
+    def _err(self, command: str, e: AaiError) -> dict:
         err = {"code": e.code, "message": e.message, "hint": e.hint}
         err.update(e.extra)
-        return {"aci": ACI_VERSION, "ok": False, "command": command, "error": err}
+        return {"aai": AAI_VERSION, "ok": False, "command": command, "error": err}
 
-    def _unknown(self, token: str, candidates: list[str], help_argv: list[str]) -> AciError:
+    def _unknown(self, token: str, candidates: list[str], help_argv: list[str]) -> AaiError:
         close = difflib.get_close_matches(token, candidates, n=3, cutoff=0.5)
-        return AciError("unknown_command", f"Unknown command '{token}'.",
+        return AaiError("unknown_command", f"Unknown command '{token}'.",
                         "Run `help` to list commands or `search \"<intent>\"` to find one.",
                         did_you_mean=[c.split(" ") for c in close] or None, help=help_argv)
 
@@ -283,7 +283,7 @@ class MockServer:
         def take_value(name: str, tok_iter_pos: int) -> tuple[Any, int]:
             if tok_iter_pos < len(rest):
                 return rest[tok_iter_pos], tok_iter_pos + 1
-            raise AciError("missing_arg", f"Flag --{name} needs a value.", f"Pass --{name} <value>.",
+            raise AaiError("missing_arg", f"Flag --{name} needs a value.", f"Pass --{name} <value>.",
                            details={"missing": [name]}, fix=[[*desc["path"], f"--{name}", "<value>"]])
 
         while i < len(rest):
@@ -309,14 +309,14 @@ class MockServer:
                 f = flags_by_name.get(name)
                 if not f:
                     close = difflib.get_close_matches(name, list(flags_by_name) + sorted(GLOBAL_FLAGS), n=3, cutoff=0.5)
-                    raise AciError("invalid_args", f"Unknown flag --{name}.", f"See `{' '.join(desc['path'])} --help` for the accepted flags.",
+                    raise AaiError("invalid_args", f"Unknown flag --{name}.", f"See `{' '.join(desc['path'])} --help` for the accepted flags.",
                                    did_you_mean=[[f"--{c}"] for c in close] or None, help=[*desc["path"], "--help"])
                 if f["type"] == "bool":
                     v: Any = (val.lower() not in ("false", "0", "no")) if eq else True
                     if neg: v = False
                 else:
                     if neg:
-                        raise AciError("invalid_args", f"--no-{name} is only valid for boolean flags.", f"Pass --{name} <value>.", help=[*desc["path"], "--help"])
+                        raise AaiError("invalid_args", f"--no-{name} is only valid for boolean flags.", f"Pass --{name} <value>.", help=[*desc["path"], "--help"])
                     v, i = (val, i) if eq else take_value(name, i)
                 self._store(f, values, v, desc)
                 continue
@@ -324,7 +324,7 @@ class MockServer:
             letter, attached = tok[1], tok[2:]
             f = shorts.get(letter)
             if not f or len(tok) > 2 and f["type"] == "bool":
-                raise AciError("invalid_args", f"Unknown or bundled short flag {tok}.", "Short flags cannot be bundled; use the long form.",
+                raise AaiError("invalid_args", f"Unknown or bundled short flag {tok}.", "Short flags cannot be bundled; use the long form.",
                                help=[*desc["path"], "--help"])
             i += 1
             if f["type"] == "bool":
@@ -348,14 +348,14 @@ class MockServer:
             elif args and args[-1].get("repeatable"):
                 values.setdefault(args[-1]["name"], []).append(tok)
             else:
-                raise AciError("invalid_args", f"Unexpected argument '{tok}'.", f"See `{' '.join(desc['path'])} --help`.", help=[*desc["path"], "--help"])
+                raise AaiError("invalid_args", f"Unexpected argument '{tok}'.", f"See `{' '.join(desc['path'])} --help`.", help=[*desc["path"], "--help"])
 
         # required + defaults + substitution + coercion
         for p in args + desc["flags"]:
             n = p["name"]
             if n not in values:
                 if p.get("required"):
-                    raise AciError("missing_arg", f"Required {'flag --' if p in desc['flags'] else 'argument '}{n} is missing.",
+                    raise AaiError("missing_arg", f"Required {'flag --' if p in desc['flags'] else 'argument '}{n} is missing.",
                                    f"See `{' '.join(desc['path'])} --help` for usage.", details={"missing": [n]},
                                    fix=[[*desc["path"], f"--{n}" if p in desc["flags"] else "", f"<{n}>"]], help=[*desc["path"], "--help"])
                 if "default" in p:
@@ -368,7 +368,7 @@ class MockServer:
         if f.get("repeatable"):
             values.setdefault(f["name"], []).append(v)
         elif f["name"] in values:
-            raise AciError("invalid_args", f"Flag --{f['name']} given more than once.", "Pass it once.", help=[*desc["path"], "--help"])
+            raise AaiError("invalid_args", f"Flag --{f['name']} given more than once.", "Pass it once.", help=[*desc["path"], "--help"])
         else:
             values[f["name"]] = v
 
@@ -381,7 +381,7 @@ class MockServer:
             return v[1:]
         if v == "@input" or v.startswith("@input."):
             if inp is None:
-                raise AciError("invalid_value", f"{v} references input, but the request has no input.",
+                raise AaiError("invalid_value", f"{v} references input, but the request has no input.",
                                "Add an `input` object to the call and reference its keys as @input.<key>.",
                                details={"flag": flag, "ref": v[1:]})
             cur = inp
@@ -389,7 +389,7 @@ class MockServer:
                 try:
                     cur = cur[int(part[1:-1])] if part.startswith("[") else cur[part]
                 except (KeyError, IndexError, TypeError):
-                    raise AciError("invalid_value", f"{v} does not resolve in input.", "Check the key name in your `input` object.",
+                    raise AaiError("invalid_value", f"{v} does not resolve in input.", "Check the key name in your `input` object.",
                                    details={"flag": flag, "ref": v[1:]})
             return cur
         return v
@@ -397,17 +397,17 @@ class MockServer:
     def _coerce(self, p: dict, v: Any, flag: str) -> Any:
         if isinstance(v, list) and p.get("repeatable"):
             return [self._coerce({**p, "repeatable": False}, x, flag) for x in v]
-        last_err: AciError | None = None
+        last_err: AaiError | None = None
         for t in p["type"].split("|"):
             try:
                 return self._coerce_one(t, p, v, flag)
-            except AciError as e:
+            except AaiError as e:
                 last_err = e
         assert last_err
         raise last_err
 
     def _coerce_one(self, t: str, p: dict, v: Any, flag: str) -> Any:
-        bad = lambda expected: AciError("invalid_value", f"Value {v!r} for {flag} is not a valid {expected}.",
+        bad = lambda expected: AaiError("invalid_value", f"Value {v!r} for {flag} is not a valid {expected}.",
                                         f"Expected {expected}.", details={"flag": flag, "expected": expected})
         if t == "string":
             if isinstance(v, str): return v
@@ -429,13 +429,13 @@ class MockServer:
         if t == "enum":
             if v in p["values"]: return v
             close = difflib.get_close_matches(str(v), p["values"], n=3, cutoff=0.4)
-            raise AciError("invalid_value", f"Value {v!r} for {flag} is not one of {p['values']}.", "Use one of the listed values.",
+            raise AaiError("invalid_value", f"Value {v!r} for {flag} is not one of {p['values']}.", "Use one of the listed values.",
                            details={"flag": flag, "expected": "|".join(p["values"])}, did_you_mean=[[c] for c in close] or None)
         if t == "json":
             if isinstance(v, str):
                 try: return json.loads(v)
                 except ValueError:
-                    raise AciError("invalid_value", f"Value for {flag} is not valid JSON.",
+                    raise AaiError("invalid_value", f"Value for {flag} is not valid JSON.",
                                    "Put the value in `input` and reference it as @input.<key>.", details={"flag": flag, "expected": "json"})
             return v
         if t.startswith("handle:"):
@@ -447,10 +447,10 @@ class MockServer:
                 names = list(self.simulations) + list(self.workflows) + list(self.runs) + list(self.tasks) + list(self.optimizations)
                 names += [s["name"] for s in self.simulations.values()] + [w["name"] for w in self.workflows.values()]
                 close = difflib.get_close_matches(hid, names, n=3, cutoff=0.5)
-                raise AciError("not_found", f"No {want} with id or name '{hid}'.", f"List available {want}s first.",
+                raise AaiError("not_found", f"No {want} with id or name '{hid}'.", f"List available {want}s first.",
                                details={"ref": hid}, did_you_mean=[[c] for c in close] or None)
             if got != want:
-                raise AciError("invalid_value", f"'{hid}' is a {got}, not a {want}.", f"Pass a {want} handle.",
+                raise AaiError("invalid_value", f"'{hid}' is a {got}, not a {want}.", f"Pass a {want} handle.",
                                details={"flag": flag, "expected": t, "got": f"handle:{got}"})
             return hid
         if t == "path":
@@ -526,7 +526,7 @@ class MockServer:
         if ("destructive" in effects or "billing" in effects) and not g.get("yes"):
             plan = self._plan(command, v)
             fix = [*desc["path"]] + [v[a["name"]] for a in desc["args"]] + ["--yes"]
-            raise AciError("confirmation_required", plan, "Confirm with the user, then re-run with --yes.",
+            raise AaiError("confirmation_required", plan, "Confirm with the user, then re-run with --yes.",
                            details={"plan": plan}, fix=[fix])
         handler = getattr(self, "cmd_" + command.replace(".", "_"))
         result = handler(v, g)
@@ -622,7 +622,7 @@ class MockServer:
         s = next((s for s in self.app["scenarios"] if s["name"] == v["name"]), None)
         if not s:
             close = difflib.get_close_matches(v["name"], [s["name"] for s in self.app["scenarios"]], n=3, cutoff=0.4)
-            raise AciError("not_found", f"No scenario '{v['name']}'.", "Run `scenario list`.", details={"ref": v["name"]},
+            raise AaiError("not_found", f"No scenario '{v['name']}'.", "Run `scenario list`.", details={"ref": v["name"]},
                            did_you_mean=[[c] for c in close] or None)
         return {"summary": f"{s['name']}: {len(s['steps'])} steps.", "data": s, "text": self._scenario_text(s)}
 
@@ -669,7 +669,7 @@ class MockServer:
     def cmd_task_cancel(self, v, g):
         t = self.tasks[v["id"]]
         if t["state"] in ("succeeded", "failed", "cancelled"):
-            raise AciError("conflict", f"Task {t['id']} already {t['state']}.", "Nothing to cancel.")
+            raise AaiError("conflict", f"Task {t['id']} already {t['state']}.", "Nothing to cancel.")
         t["state"] = "cancelled"
         return {"summary": f"Task {t['id']} cancelled.", "task": self._task_view(t)}
 
@@ -698,7 +698,7 @@ class MockServer:
             if s["name"] == ref: return k
         names = list(self.simulations) + [s["name"] for s in self.simulations.values()]
         close = difflib.get_close_matches(ref, names, n=3, cutoff=0.5)
-        raise AciError("not_found", f"No simulation with id or name '{ref}'.", "Run `simulation list` to see available models.",
+        raise AaiError("not_found", f"No simulation with id or name '{ref}'.", "Run `simulation list` to see available models.",
                        details={"ref": ref}, did_you_mean=[["simulation", "inspect", c] for c in close] or None, fix=[["simulation", "list"]])
 
     def cmd_simulation_inspect(self, v, g):
@@ -730,7 +730,7 @@ class MockServer:
         for k, w in self.workflows.items():
             if w["name"] == ref: return k
         close = difflib.get_close_matches(ref, list(self.workflows) + [w["name"] for w in self.workflows.values()], n=3, cutoff=0.5)
-        raise AciError("not_found", f"No workflow with id or name '{ref}'.", "Run `workflow list`.", details={"ref": ref},
+        raise AaiError("not_found", f"No workflow with id or name '{ref}'.", "Run `workflow list`.", details={"ref": ref},
                        did_you_mean=[[c] for c in close] or None, fix=[["workflow", "list"]])
 
     def cmd_workflow_validate(self, v, g):
@@ -743,7 +743,7 @@ class MockServer:
     def cmd_workflow_run(self, v, g):
         wid = self._find_wf(v["workflow"]); w = self.workflows[wid]
         if not w["validated"]:
-            raise AciError("precondition_failed", f"Workflow {wid} has not been validated.", "Validate it first, then run again.",
+            raise AaiError("precondition_failed", f"Workflow {wid} has not been validated.", "Validate it first, then run again.",
                            fix=[["workflow", "validate", wid]], help=["workflow", "run", "--help"])
         rid, tid = self._next("r"), self._next("t")
         self.runs[rid] = {"id": rid, "workflow": wid, "state": "running"}
@@ -762,14 +762,14 @@ class MockServer:
         sid = v["model"]; s = self.simulations[sid]
         vars_ = v["vars"]; objs = v["objectives"]
         if not isinstance(vars_, list) or not all(isinstance(x, str) for x in vars_):
-            raise AciError("invalid_value", "--vars must be a JSON array of parameter names.", "Example: @input.vars with input {\"vars\": [\"chord\",\"twist\"]}.",
+            raise AaiError("invalid_value", "--vars must be a JSON array of parameter names.", "Example: @input.vars with input {\"vars\": [\"chord\",\"twist\"]}.",
                            details={"flag": "vars", "expected": "array of string"})
         unknown = [x for x in vars_ if x not in {p["name"] for p in s["parameters"]}]
         if unknown:
-            raise AciError("invalid_value", f"Unknown parameter(s) {unknown} for model {sid}.", "Check parameter names with `simulation inspect <model> --parameters`.",
+            raise AaiError("invalid_value", f"Unknown parameter(s) {unknown} for model {sid}.", "Check parameter names with `simulation inspect <model> --parameters`.",
                            details={"flag": "vars", "expected": [p["name"] for p in s["parameters"]]}, fix=[["simulation", "inspect", sid, "--parameters"]])
         if not isinstance(objs, list) or not all(isinstance(o, dict) and "name" in o for o in objs):
-            raise AciError("invalid_value", "--objectives must be a JSON array of {name, goal}.", "Example: [{\"name\":\"lift_drag\",\"goal\":\"max\"}].",
+            raise AaiError("invalid_value", "--objectives must be a JSON array of {name, goal}.", "Example: [{\"name\":\"lift_drag\",\"goal\":\"max\"}].",
                            details={"flag": "objectives", "expected": "array of {name, goal}"})
         oid, wid = self._next("opt"), None
         wid = f"wf_{oid}"
@@ -783,7 +783,7 @@ class MockServer:
     def cmd_results_pareto(self, v, g):
         run = self.runs[v["run"]]
         if run["state"] != "succeeded":
-            raise AciError("precondition_failed", f"Run {run['id']} has not finished.", "Wait for the task first.", fix=[["task", "list"]])
+            raise AaiError("precondition_failed", f"Run {run['id']} has not finished.", "Wait for the task first.", fix=[["task", "list"]])
         rows = [{"chord": 1.12, "twist": 2.1, "lift_drag": 18.4}, {"chord": 1.05, "twist": 1.4, "lift_drag": 17.9}, {"chord": 1.20, "twist": 3.0, "lift_drag": 17.6}]
         limit = min(int(g.get("limit", DEFAULT_LIMIT)), len(rows))
         return {"summary": f"9 Pareto points; best lift/drag {rows[0]['lift_drag']} at chord={rows[0]['chord']}, twist=+{rows[0]['twist']}°.",

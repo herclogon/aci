@@ -1,4 +1,4 @@
-# ACI agent prompt
+# AAI agent prompt
 
 Host: fill `{…}` from the manifest (`info`), put the block below in the
 system prompt. `{tool}` is the registered tool name. For models with weak

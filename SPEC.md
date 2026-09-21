@@ -1,4 +1,4 @@
-# Agent Command Interface (ACI)
+# Agent Application Interface (AAI)
 
 **Protocol specification — Draft 0.2**
 
@@ -11,7 +11,7 @@ conformance.
 
 ## 0. Summary
 
-ACI is a protocol for exposing an application to AI agents the way a good
+AAI is a protocol for exposing an application to AI agents the way a good
 command-line tool exposes itself to a person: through a **single entry point**,
 a **hierarchical command tree that is discovered at runtime**, commands that
 are **organized around what users want to accomplish** rather than around the
@@ -27,10 +27,10 @@ invoke(argv) -> result
 Everything else — listing commands, reading a command's contract, searching by
 intent, following a scenario, tracking long-running work — is itself a command
 in the tree. An agent needs to know a ~130-token bootstrap text to use any
-ACI application, regardless of whether that application has 10 or 10,000
+AAI application, regardless of whether that application has 10 or 10,000
 commands.
 
-ACI is **not** a shell. `argv` is parsed against declared schemas; there is
+AAI is **not** a shell. `argv` is parsed against declared schemas; there is
 no process execution, no pipes, no expansion.
 
 ---
@@ -71,7 +71,7 @@ because those tools have properties that conventional REST/GraphQL APIs lack:
 - **A2A / ACP (Agent Client Protocol)** manage agent-to-agent delegation and
   editor↔agent sessions; they do not describe application capabilities.
 
-ACI fills the gap: a **searchable, executable, self-describing command tree**.
+AAI fills the gap: a **searchable, executable, self-describing command tree**.
 It is exposed to an LLM as **one tool** whose description is a constant
 bootstrap text (§5.4), and can equally be served over HTTP, JSON-RPC or stdio
 — the transport does not determine the context cost.
@@ -99,7 +99,7 @@ bootstrap text (§5.4), and can equally be served over HTTP, JSON-RPC or stdio
 
 | Term | Meaning |
 |---|---|
-| **Application** | The system exposed through ACI (one command tree, one manifest). |
+| **Application** | The system exposed through AAI (one command tree, one manifest). |
 | **Server** | The implementation that receives `invoke` requests and serves the tree. |
 | **Client / Agent** | The caller. Usually an LLM agent; may be a human via a generated CLI. |
 | **Caller identity** | The authenticated principal behind a request, as established by the transport. Tasks, temporary handles, sessions and idempotency keys are scoped to it. |
@@ -129,7 +129,7 @@ Key words MUST, SHOULD, MAY are used as in RFC 2119.
 
 ```json
 {
-  "aci": "0.2",
+  "aai": "0.2",
   "id": "req-1",
   "argv": ["workflow", "run", "--workflow", "wing", "--params", "@input.params"],
   "input": { "params": { "mach": 0.8, "alpha": [0, 2, 4] } },
@@ -145,7 +145,7 @@ Key words MUST, SHOULD, MAY are used as in RFC 2119.
 
 | Field | Req. | Description |
 |---|---|---|
-| `aci` | yes | Protocol version, `MAJOR.MINOR`. See *Versioning* below. |
+| `aai` | yes | Protocol version, `MAJOR.MINOR`. See *Versioning* below. |
 | `id` | no | Opaque correlation id, echoed verbatim in the response. Needed on pipelined transports (stdio). |
 | `line` | yes* | The command as one string, e.g. `"workflow run --workflow wing"`, lexed by the server per §4.3.1. The primary form (P10). |
 | `argv` | yes* | Alternative to `line`: pre-split tokens, path first. MUST be non-empty. Exactly one of `argv`/`line` MUST be present. |
@@ -155,8 +155,8 @@ Key words MUST, SHOULD, MAY are used as in RFC 2119.
 
 Unknown top-level fields and unknown `options` keys MUST be ignored.
 
-**Versioning.** A server MUST accept a request whose `aci` MAJOR equals its
-own and whose MINOR is ≤ its own; the response `aci` is always the server's
+**Versioning.** A server MUST accept a request whose `aai` MAJOR equals its
+own and whose MINOR is ≤ its own; the response `aai` is always the server's
 version. Any other version → `unsupported_version` with
 `details.supported`.
 
@@ -168,7 +168,7 @@ with an error envelope.
 
 ```json
 {
-  "aci": "0.2",
+  "aai": "0.2",
   "id": "req-1",
   "ok": true,
   "command": "workflow.run",
@@ -203,7 +203,7 @@ with an error envelope.
 
 ```json
 {
-  "aci": "0.2",
+  "aai": "0.2",
   "ok": false,
   "command": "workflow.run",
   "error": {
@@ -250,7 +250,7 @@ Returns the manifest (A.9):
   "name": "engineering",
   "title": "Engineering Platform",
   "version": "3.2.0",
-  "aci": "0.2",
+  "aai": "0.2",
   "levels": ["core", "search", "scenarios", "tasks", "sessions", "handles"],
   "description": "Build, validate and run simulation and optimization workflows.",
   "top_scenarios": ["optimize-geometry", "import-cfd-model", "compare-runs"],
@@ -553,7 +553,7 @@ Children carry only `name`, `kind`, `summary`, and optional `effects`/`locked`
 
 A scenario is procedural knowledge: how to accomplish a goal with the tree.
 The server serves scenarios; the **agent** executes them step by step. (A
-server-side `scenario run` is a vendor extension, not part of ACI.)
+server-side `scenario run` is a vendor extension, not part of AAI.)
 
 ```json
 {
@@ -710,7 +710,7 @@ session reset
 
 Commands return **handles** — opaque, typed ids — so that outputs of one
 command become inputs of another without the agent copying large data
-through its context (the ACI replacement for pipes).
+through its context (the AAI replacement for pipes).
 
 ```json
 "handles": [ { "id": "r_42", "type": "run", "label": "wing / 2026-09-21", "expires": null } ]
@@ -843,7 +843,7 @@ For each command and caller the application assigns one of three states:
 
 | Code | Meaning | MUST include |
 |---|---|---|
-| `unsupported_version` | Request `aci` not accepted. | `details.supported` |
+| `unsupported_version` | Request `aai` not accepted. | `details.supported` |
 | `bad_request` | Malformed envelope. | `hint` |
 | `shell_syntax_rejected` | `line` contained unquoted shell operators. | `hint` explaining quoting, `@input`, and placeholders |
 | `unknown_command` | Path does not resolve (or is hidden). | `did_you_mean` (≤ 3 paths), `help` pointing to the nearest resolved node |
@@ -882,7 +882,7 @@ unsupported_version → bad_request → shell_syntax_rejected → unknown_comman
 ## 5. Transport bindings
 
 All bindings carry the same envelope (§4.1). Authentication is out of scope
-for ACI; bindings reuse their transport's conventions. A server MUST
+for AAI; bindings reuse their transport's conventions. A server MUST
 implement at least one binding and document which; the single-tool binding
 (§5.4) is RECOMMENDED.
 
@@ -911,11 +911,11 @@ stream. `done` carries the full Task object including `result`.
 
 ### 5.2 JSON-RPC 2.0
 
-- Method `aci.invoke`, params = request envelope, result = response envelope.
+- Method `aai.invoke`, params = request envelope, result = response envelope.
 - Domain errors are returned as a *result* with `ok: false`, not as JSON-RPC
   errors; JSON-RPC errors are reserved for protocol-level failures
   (`bad_request` and `unsupported_version` MAY be mapped to them).
-- Notification `aci.task.event` with `{ "task": "t_918", "event": "progress", "data": {…} }`.
+- Notification `aai.task.event` with `{ "task": "t_918", "event": "progress", "data": {…} }`.
   Notifications require a bidirectional transport (WebSocket, stdio); over
   plain HTTP the binding is request/response only and events fall back to
   SSE (§5.1).
@@ -923,14 +923,14 @@ stream. `done` carries the full Task object including `result`.
 ### 5.3 stdio
 
 Newline-delimited JSON, one envelope per line, over a child process's
-stdin/stdout. Suitable for local tools and for wrapping ACI in an
+stdin/stdout. Suitable for local tools and for wrapping AAI in an
 editor/agent host. Requests SHOULD carry `id` so responses can be
 correlated when pipelined. Task events are emitted as lines with `"event"`
 and `"task"` in place of `"ok"`.
 
 ### 5.4 Single-tool binding (LLM tool-use APIs and MCP)
 
-An ACI application is exposed to a model as **exactly one tool**, whether
+An AAI application is exposed to a model as **exactly one tool**, whether
 through a provider's native tool-use / function-calling API or through an
 MCP server. The parameter schema, in JSON Schema:
 
@@ -954,7 +954,7 @@ MCP server. The parameter schema, in JSON Schema:
   global flags.
 - The key under which a provider carries the schema (`input_schema`,
   `parameters`, …) and any provider "strict" mode are host-specific and
-  outside ACI.
+  outside AAI.
 - **Rendering is the host's choice.** The tool result is the response
   envelope serialized as JSON text by default. Hosts serving models with
   weak tool calling SHOULD set `options.format: "text"` on every call and
@@ -966,10 +966,10 @@ MCP server. The parameter schema, in JSON Schema:
 
 ### 5.5 Generated CLI
 
-A binary CLI can be generated from (or thin-wrapped around) any ACI server:
+A binary CLI can be generated from (or thin-wrapped around) any AAI server:
 `app <argv…>` sends `argv` as-is and prints `text` (or `summary` + `data`).
 Humans and agents share one interface, one help system, one set of examples.
-This is the recommended way to *test* an ACI tree: if a person cannot use
+This is the recommended way to *test* an AAI tree: if a person cannot use
 it from the terminal, an agent will struggle too.
 
 ---
@@ -1075,7 +1075,7 @@ to preview.
    a handle and a summary.
 8. **Make `--dry-run` real.** It is how agents (and their operators) build
    trust.
-9. **Keep the conventional API.** ACI is a semantic layer over REST/GraphQL/
+9. **Keep the conventional API.** AAI is a semantic layer over REST/GraphQL/
    queues; it does not replace them.
 10. **Test with the generated CLI.** If `app help` reads badly to you, fix
     the tree, not the prompt.
@@ -1088,13 +1088,13 @@ to preview.
 
 | Protocol | Relationship |
 |---|---|
-| **Native tool calling** | ACI is exposed as one tool whose description is the bootstrap text (§5.4). The tree, `help` and `search` replace a growing tool list. |
-| **MCP** | One host for the single-tool binding. ACI's tree/help/search replaces eager tool registration. |
-| **OpenAPI / GraphQL** | Typical backends behind an ACI server. ACI descriptors may reference their schemas via `schema_ref`. |
-| **Agent Skills** | An ACI scenario is the executable counterpart of a skill's procedure. Skills can point at ACI commands. |
-| **ACP (Agent Client Protocol)** | Orthogonal: ACP connects editors to coding agents; those agents may call ACI applications. |
-| **A2A** | An A2A Agent Card can advertise an ACI endpoint as the way to work with the application directly. |
-| **Classic CLI** | ACI is a CLI's interface with the shell removed and the output made structural. A CLI can be generated from it (§5.5). |
+| **Native tool calling** | AAI is exposed as one tool whose description is the bootstrap text (§5.4). The tree, `help` and `search` replace a growing tool list. |
+| **MCP** | One host for the single-tool binding. AAI's tree/help/search replaces eager tool registration. |
+| **OpenAPI / GraphQL** | Typical backends behind an AAI server. AAI descriptors may reference their schemas via `schema_ref`. |
+| **Agent Skills** | An AAI scenario is the executable counterpart of a skill's procedure. Skills can point at AAI commands. |
+| **ACP (Agent Client Protocol)** | Orthogonal: ACP connects editors to coding agents; those agents may call AAI applications. |
+| **A2A** | An A2A Agent Card can advertise an AAI endpoint as the way to work with the application directly. |
+| **Classic CLI** | AAI is a CLI's interface with the shell removed and the output made structural. A CLI can be generated from it (§5.5). |
 
 **Caching.** A client MAY cache `help`, `--help` and `scenario` results
 while the manifest `version` is unchanged; a server MUST bump `version`
@@ -1106,7 +1106,7 @@ whenever the tree or any descriptor changes.
 
 **Core**
 - [ ] `invoke` over at least one binding; `argv` and `line` both accepted; unquoted shell operators rejected, quoted ones accepted.
-- [ ] `aci` version rule and `unsupported_version`; malformed envelopes answered with `bad_request`.
+- [ ] `aai` version rule and `unsupported_version`; malformed envelopes answered with `bad_request`.
 - [ ] `id` echoed when present; `command` is the deepest resolved node, `""` if none.
 - [ ] `info` returns manifest with `levels`; absent `limits` keys mean the A.9 defaults.
 - [ ] `help`, `help PATH`, `<path> --help` in `text` and `json`; bare group path behaves as `help`.
@@ -1133,7 +1133,7 @@ whenever the tree or any descriptor changes.
 
 - **Not a shell.** Servers MUST dispatch only registered commands. `line`
   lexing is lexical only; there is no expansion of any kind.
-- **Help content is data.** For third-party ACI servers, clients SHOULD treat
+- **Help content is data.** For third-party AAI servers, clients SHOULD treat
   `summary`, `hint`, `next`, `scenario` text as untrusted content (prompt
   injection surface), and MAY apply their own approval policies based on
   `effects` regardless of what the server suggests.
@@ -1142,7 +1142,7 @@ whenever the tree or any descriptor changes.
 - **Existence is not leaked.** Hidden commands, other callers' tasks,
   temporary handles and sessions are indistinguishable from nonexistent
   ones.
-- **Isolation is out of scope.** ACI expresses effects and permissions; it
+- **Isolation is out of scope.** AAI expresses effects and permissions; it
   does not provide sandboxing, network policy, or tenant isolation. Those
   belong to the deployment.
 - **Audit.** Servers SHOULD log `argv`, caller, `effects`, and result code for
@@ -1177,9 +1177,9 @@ Not part of conformance for 0.2.
 ```json
 {
   "type": "object",
-  "required": ["aci"],
+  "required": ["aai"],
   "properties": {
-    "aci":     { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+    "aai":     { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
     "id":      { "type": "string" },
     "argv":    { "type": "array", "items": { "type": "string" }, "minItems": 1 },
     "line":    { "type": "string" },
@@ -1210,9 +1210,9 @@ Not part of conformance for 0.2.
 ```json
 {
   "type": "object",
-  "required": ["aci", "ok", "command"],
+  "required": ["aai", "ok", "command"],
   "properties": {
-    "aci":       { "type": "string" },
+    "aai":       { "type": "string" },
     "id":        { "type": "string" },
     "ok":        { "type": "boolean" },
     "command":   { "type": "string" },
@@ -1392,12 +1392,12 @@ Not part of conformance for 0.2.
 ```json
 {
   "type": "object",
-  "required": ["name", "title", "version", "aci", "levels", "description"],
+  "required": ["name", "title", "version", "aai", "levels", "description"],
   "properties": {
     "name":          { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
     "title":         { "type": "string" },
     "version":       { "type": "string" },
-    "aci":           { "type": "string" },
+    "aai":           { "type": "string" },
     "levels":        { "type": "array", "items": { "enum": ["core", "search", "scenarios", "tasks", "sessions", "handles", "streaming"] } },
     "description":   { "type": "string" },
     "top_scenarios": { "type": "array", "items": { "type": "string" } },

@@ -1,4 +1,4 @@
-# ACI — Agent Command Interface
+# AAI — Agent Application Interface
 
 [![Tests](https://github.com/herclogon/aci/actions/workflows/tests.yml/badge.svg)](https://github.com/herclogon/aci/actions/workflows/tests.yml)
 
@@ -15,7 +15,7 @@ invoke(argv) -> result
 That is the whole protocol. Listing commands, reading a command's contract,
 searching by intent, following a scenario, tracking long-running work — all
 of it is itself a command in the tree. An agent needs a ~130-token
-bootstrap text to use any ACI application, whether it has 10 commands or
+bootstrap text to use any AAI application, whether it has 10 commands or
 10,000.
 
 **Status:** Draft 0.2 — specification only, written to be implementable.
@@ -30,10 +30,10 @@ work begins, and they carry no hierarchy, no `--help`, no procedures.
 Agents are demonstrably productive with `git`, `gh`, `kubectl` — tools
 whose interface is discovered progressively and organised by task.
 
-ACI is that interface with the shell removed and the output made
+AAI is that interface with the shell removed and the output made
 structural:
 
-| | Tool calling / MCP | ACI |
+| | Tool calling / MCP | AAI |
 |---|---|---|
 | Bootstrap cost | grows with the tool count | constant |
 | Discovery | eager dump | `help` → `help <group>` → `<command> --help` |
@@ -90,8 +90,8 @@ executed; only registered commands run.
 | Path | What |
 |---|---|
 | [`SPEC.md`](SPEC.md) | The protocol: envelope, argv grammar, descriptors, scenarios, tasks, handles, sessions, permissions, error catalogue, transport bindings, JSON schemas, conformance checklist. |
-| [`AGENT_PROMPT.md`](AGENT_PROMPT.md) | A ~230-token system prompt a host puts in front of an agent to drive any ACI application. |
-| [`tests/`](tests/) | LLM evaluation harness: an in-process mock ACI application, eval cases, and a runner for Anthropic / OpenAI-compatible endpoints (including local models via Ollama). See [`tests/README.md`](tests/README.md). |
+| [`AGENT_PROMPT.md`](AGENT_PROMPT.md) | A ~230-token system prompt a host puts in front of an agent to drive any AAI application. |
+| [`tests/`](tests/) | LLM evaluation harness: an in-process mock AAI application, eval cases, and a runner for Anthropic / OpenAI-compatible endpoints (including local models via Ollama). See [`tests/README.md`](tests/README.md). |
 | [`CHANGELOG.md`](CHANGELOG.md) | Changes between drafts. |
 
 ## Conformance levels
@@ -130,11 +130,11 @@ prompt, the help text budget, or the error hints.
 
 ## Relationship to other protocols
 
-- **Native tool calling / MCP** — ACI is exposed as one tool; its tree replaces a growing tool list.
-- **OpenAPI / GraphQL** — typical backends behind an ACI server; descriptors may reference their schemas.
-- **Agent Skills** — an ACI scenario is the executable counterpart of a skill's procedure.
-- **A2A / ACP** — orthogonal; an agent card can advertise an ACI endpoint.
-- **Classic CLI** — a CLI can be generated from any ACI server, and is the recommended way to test a tree.
+- **Native tool calling / MCP** — AAI is exposed as one tool; its tree replaces a growing tool list.
+- **OpenAPI / GraphQL** — typical backends behind an AAI server; descriptors may reference their schemas.
+- **Agent Skills** — an AAI scenario is the executable counterpart of a skill's procedure.
+- **A2A / ACP** — orthogonal; an agent card can advertise an AAI endpoint.
+- **Classic CLI** — a CLI can be generated from any AAI server, and is the recommended way to test a tree.
 
 ## Contributing
 

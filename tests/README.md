@@ -1,6 +1,6 @@
 # LLM evaluation harness
 
-Checks whether a given model can drive an ACI application using only the
+Checks whether a given model can drive an AAI application using only the
 protocol's own guidance: the single tool from SPEC.md §5.4, the bootstrap
 text from §6, and the system prompt in `../AGENT_PROMPT.md`.
 
@@ -9,7 +9,7 @@ text from §6, and the system prompt in `../AGENT_PROMPT.md`.
 | File | Role |
 |---|---|
 | `mock_app.json` | Fixture application: tree (4 groups, 10 commands), 2 scenarios, initial state. |
-| `aci_mock.py` | In-process ACI server over the fixture — lexing, flag rules, `@input`, coercion, help, search, tasks, `--dry-run`/`--yes`, error catalogue. `render_text()` is the host-side text rendering. |
+| `aai_mock.py` | In-process AAI server over the fixture — lexing, flag rules, `@input`, coercion, help, search, tasks, `--dry-run`/`--yes`, error catalogue. `render_text()` is the host-side text rendering. |
 | `cases.json` | Eval cases: user turns, pass checks, call budget. |
 | `scripted_agents.py` | Golden script per case (proves each case is solvable). |
 | `llm_eval.py` | Runner + provider adapters (`anthropic`, `openai`-compatible, `openrouter`, `scripted`). |

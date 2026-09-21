@@ -1,4 +1,4 @@
-"""Run the ACI evaluation across a descending set of Qwen model sizes.
+"""Run the AAI evaluation across a descending set of Qwen model sizes.
 
 The script checks OpenRouter's live catalog before starting. Models that are no
 longer offered are reported as unavailable instead of being silently replaced.

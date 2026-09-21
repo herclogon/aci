@@ -1,7 +1,7 @@
 # Changelog
 
-This file records notable changes to the ACI specification and its evaluation
-harness. Because ACI is still a draft, incompatible changes may occur between
+This file records notable changes to the AAI specification and its evaluation
+harness. Because AAI is still a draft, incompatible changes may occur between
 draft releases.
 
 ## [Unreleased]
@@ -10,6 +10,13 @@ draft releases.
 
 - A first-class OpenRouter evaluation provider using `OPENROUTER_API_KEY`.
 - A catalog-validated Qwen model-size sweep runner.
+
+### Changed
+
+- Renamed Agent Command Interface (ACI) to Agent Application Interface (AAI),
+  including the wire-level field (`aci` → `aai`), JSON-RPC method names,
+  schemas, mock implementation, and evaluation harness. This is a breaking
+  draft change.
 
 ## [0.2] - 2026-09-21
 
